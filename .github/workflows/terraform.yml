@@ -1,0 +1,103 @@
+name: Deploy Infraestrutura
+run-name: ${{ github.actor }} iniciou o deploy 
+
+on:
+  push:
+    branches: [ "stg", "prod" ]
+
+permissions:
+  id-token: write # permite que a action solicite o token OIDC
+  contents: read  # permite que a action baixe o seu código
+
+jobs:
+  # 1. Validação do código
+  codevalidate:
+    name: "Verifica o código Terraform"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init -backend=false
+      - run: terraform validate
+
+  # 2. Verificação de Segurança
+  security_scan:
+    name: "Análise de Segurança"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        
+      - name: tfsec
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          soft_fail: true
+          
+  # 3. Provisionamento e Configuração
+  infraestrutura:
+    name: "Provisionar e Configurar"
+    runs-on: ubuntu-latest
+    needs: [codevalidate, security_scan]
+    env:
+      TF_VAR_bloco_ips_liberados: ${{ secrets.IPS_PERMITIDOS }}
+      TF_WORKING_DIR: ${{ github.ref == 'refs/heads/prod' && './production' || './staging' }}
+      TF_VAR_chave_ssh: ${{ github.ref == 'refs/heads/production' && secrets.CHAVE_PROD || secrets.CHAVE_STAG }}
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Criar arquivo de backend (PROD)
+        if: github.ref == 'refs/heads/prod' 
+        run: |
+          cat <<'EOF' > backend-config.tfvars
+          ${{ secrets.BACKEND_CONFIG_PROD }}
+          EOF
+
+      - name: Criar arquivo de backend (STG)
+        if: github.ref == 'refs/heads/stg' 
+        run: |
+          cat <<'EOF' > backend-config.tfvars
+          ${{ secrets.BACKEND_CONFIG_STG }}
+          EOF
+
+      - name: Terraform Init
+        run: terraform init -backend-config=../backend-config.tfvars -reconfigure
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Configurar Inventário do Ansible
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "[web]" > hosts.ini
+          echo "$(terraform output -raw instance_public_web_addr) ansible_user=ec2-user" >> hosts.ini
+          echo "" >> hosts.ini
+          echo "[db]" >> hosts.ini
+          echo "$(terraform output -raw instance_ip_db_addr) ansible_user=ec2-user" >> hosts.ini
+
+      - name: Rodar Ansible Playbook
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: 'False'
+          # Seleciona o secret baseado na branch: stg -> AWS_SSH_KEY_STG | prod -> AWS_SSH_KEY_PROD
+          SSH_PRIVATE_KEY: ${{ github.ref == 'refs/heads/prod' && secrets.AWS_SSH_KEY_PROD || secrets.AWS_SSH_KEY_STG }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > key.pem
+          chmod 400 key.pem
+          
+          # Captura o IP da Web para o ProxyCommand
+          WEB_IP=$(terraform output -raw instance_public_web_addr)
+          
+          ansible-playbook -i hosts.ini playbook.yml --private-key key.pem \
+            --ssh-common-args="-o ProxyCommand='ssh -i key.pem -W %h:%p -q ec2-user@$WEB_IP -o StrictHostKeyChecking=no' -o StrictHostKeyChecking=no"

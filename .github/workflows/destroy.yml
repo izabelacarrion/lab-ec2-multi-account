@@ -1,0 +1,53 @@
+name: "⚠️ DESTROY INFRAESTRUTURA"
+run-name: "DESTRUIÇÃO disparada por ${{ github.actor }}"
+
+on:
+  workflow_dispatch: # Apenas disparado manualmente pelo botão
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform-destroy:
+    name: "Executar Terraform Destroy"
+    runs-on: ubuntu-latest
+    env:
+      # Define o diretório baseado na branch selecionada no botão do GitHub
+      TF_WORKING_DIR: ${{ github.ref == 'refs/heads/prod' && './production' || './staging' }}
+      TF_VAR_bloco_ips_liberados: ${{ secrets.IPS_PERMITIDOS }}
+      TF_VAR_chave_ssh: ${{ github.ref == 'refs/heads/production' && secrets.CHAVE_PROD || secrets.CHAVE_STAG }}
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Criar arquivo de backend (PROD)
+        if: github.ref == 'refs/heads/prod' 
+        run: |
+          cat <<'EOF' > backend-config.tfvars
+          ${{ secrets.BACKEND_CONFIG_PROD }}
+          EOF
+
+      - name: Criar arquivo de backend (STG)
+        if: github.ref == 'refs/heads/stg' 
+        run: |
+          cat <<'EOF' > backend-config.tfvars
+          ${{ secrets.BACKEND_CONFIG_STG }}
+          EOF
+
+      - name: Terraform Init
+        run: terraform init -backend-config=../backend-config.tfvars -reconfigure
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve
+        working-directory: ${{ env.TF_WORKING_DIR }}

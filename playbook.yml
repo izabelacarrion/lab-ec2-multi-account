@@ -1,0 +1,36 @@
+---
+- name: Configuração da Camada Web (Nginx)
+  hosts: web
+  become: yes
+  tasks:
+    - name: Instalar o Nginx mais recente
+      dnf:
+        name: nginx
+        state: present
+
+    - name: Garantir que o Nginx está habilitado e rodando
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Criar página index de teste
+      copy:
+        content: "<h1>Servidor Web Ativo - Deploy via GitHub Actions</h1>"
+        dest: /usr/share/nginx/html/index.html
+        mode: '0644'
+
+- name: Configuração da Camada de Banco de Dados
+  hosts: db
+  become: yes
+  tasks:
+    - name: Instalar o servidor MariaDB
+      dnf:
+        name: mariadb105-server
+        state: present
+
+    - name: Garantir que o MariaDB está rodando
+      service:
+        name: mariadb
+        state: started
+        enabled: yes
