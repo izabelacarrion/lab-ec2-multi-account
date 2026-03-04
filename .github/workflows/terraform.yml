@@ -97,7 +97,7 @@ jobs:
           chmod 400 key.pem
           
           # Captura o IP da Web para o ProxyCommand
-          WEB_IP=$(terraform output -raw instance_public_web_addr)
+          WEB_IP=$(terraform output -raw ip_publico_web)
           
           ansible-playbook -i hosts.ini playbook.yml --private-key key.pem \
             --ssh-common-args="-o ProxyCommand='ssh -i key.pem -W %h:%p -q ec2-user@$WEB_IP -o StrictHostKeyChecking=no' -o StrictHostKeyChecking=no"
