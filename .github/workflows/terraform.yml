@@ -74,12 +74,7 @@ jobs:
       - name: Terraform Init
         run: terraform init -backend-config=../backend-config.tfvars -reconfigure
         working-directory: ${{ env.TF_WORKING_DIR }}
-
-      - name: Debug Variable Length
-        run: echo "O tamanho do nome da role é ${#NOME}"
-        env:
-          NOME: ${{ secrets.SSM_PROFILE_NAME }}
-
+        
       - name: Terraform Apply
         run: terraform apply -auto-approve
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -88,6 +83,10 @@ jobs:
         run: |
           curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
           sudo dpkg -i session-manager-plugin.deb
+
+      - name: Instalar boto3 e botocore
+        run: |
+          python3 -m pip install boto3 botocore
 
       - name: Configurar Inventário do Ansible (Usando IDs)
         working-directory: ${{ env.TF_WORKING_DIR }}
