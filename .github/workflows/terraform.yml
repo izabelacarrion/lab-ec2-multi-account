@@ -81,11 +81,11 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           echo "[web]" > hosts.ini
-          echo "$(terraform output -raw instance_public_web_addr) ansible_user=ec2-user" >> hosts.ini
+          echo "$(terraform output -raw ip_publico_web) ansible_user=ec2-user" >> hosts.ini
           echo "" >> hosts.ini
           echo "[db]" >> hosts.ini
-          echo "$(terraform output -raw instance_ip_db_addr) ansible_user=ec2-user" >> hosts.ini
-
+          echo "$(terraform output -raw ip_privado_db) ansible_user=ec2-user" >> hosts.ini
+          
       - name: Rodar Ansible Playbook
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
