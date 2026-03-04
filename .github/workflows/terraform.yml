@@ -111,18 +111,20 @@ jobs:
           ANSIBLE_HOST_KEY_CHECKING: 'False'
           SSH_PRIVATE_KEY: ${{ github.ref == 'refs/heads/prod' && secrets.AWS_SSH_KEY_PROD || secrets.AWS_SSH_KEY_STG }}
         run: |
-          # 1. Pausa estratégica para propagação da regra do SG
+          # 1. Pausa estratégica para propagação das regras de rede na AWS
           echo "Aguardando 20 segundos para a rede AWS estabilizar..."
           sleep 20
           
-          # 2. Preparação da Chave
+          # 2. Preparação da Chave SSH
           echo "$SSH_PRIVATE_KEY" > key.pem
           chmod 400 key.pem
           
-          # 3. Execução do Ansible
-          # Removido o ProxyCommand para a conexão na WEB (conexão direta)
+          WEB_IP=$(terraform output -raw ip_publico_web)
+          
+          # 3. Execução do Ansible com ProxyCommand para a DB
+          # O Runner conecta na WEB e usa a WEB como ponte
           ansible-playbook -i hosts.ini ../playbook.yml --private-key key.pem \
-            --ssh-common-args="-o ConnectTimeout=60 -o ConnectionAttempts=10 -o StrictHostKeyChecking=no"
+            --ssh-common-args="-o StrictHostKeyChecking=no -o ConnectTimeout=60 -o ProxyCommand='ssh -i key.pem -W %h:%p -q ec2-user@$WEB_IP -o StrictHostKeyChecking=no'"
             
       - name: Remover IP do Runner do Security Group
         if: always()
