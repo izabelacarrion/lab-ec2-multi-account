@@ -18,3 +18,13 @@ output "sg_id" {
   value       = aws_security_group.sg_web.id # O recurso de SG que você criou no módulo
   description = "ID do Security Group para liberar o SSH"
 }
+
+output "instance_id_web" {
+  description = "ID da instancia Web para o Ansible via SSM"
+  value       = aws_instance.srv_web.id
+}
+
+output "instance_id_db" {
+  description = "ID da instancia DB para o Ansible via SSM"
+  value       = aws_instance.srv_db.id
+}
