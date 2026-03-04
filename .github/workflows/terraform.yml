@@ -56,13 +56,19 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Criar arquivo de backend
+      - name: Criar arquivo de backend (PROD)
+        if: github.ref == 'refs/heads/prod' 
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/prod" ]; then
-            echo "${{ secrets.BACKEND_CONFIG_PROD }}" > backend-config.tfvars
-          else
-            echo "${{ secrets.BACKEND_CONFIG_STG }}" > backend-config.tfvars
-          fi
+          cat <<'EOF' > backend-config.tfvars
+          ${{ secrets.BACKEND_CONFIG_PROD }}
+          EOF
+
+      - name: Criar arquivo de backend (STG)
+        if: github.ref == 'refs/heads/stg' 
+        run: |
+          cat <<'EOF' > backend-config.tfvars
+          ${{ secrets.BACKEND_CONFIG_STG }}
+          EOF
 
       - name: Terraform Init
         run: terraform init -backend-config=../backend-config.tfvars -reconfigure
