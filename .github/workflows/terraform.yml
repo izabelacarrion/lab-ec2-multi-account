@@ -75,6 +75,11 @@ jobs:
         run: terraform init -backend-config=../backend-config.tfvars -reconfigure
         working-directory: ${{ env.TF_WORKING_DIR }}
 
+      - name: Debug Variable Length
+        run: echo "O tamanho do nome da role é ${#NOME}"
+        env:
+          NOME: ${{ secrets.SSM_PROFILE_NAME }}
+
       - name: Terraform Apply
         run: terraform apply -auto-approve
         working-directory: ${{ env.TF_WORKING_DIR }}
