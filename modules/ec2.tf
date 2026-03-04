@@ -3,6 +3,8 @@ resource "aws_instance" "srv_web" {
   ami           = data.aws_ami.amazon_linux.id
   instance_type = "t2.micro"
 
+  iam_instance_profile = var.ssm_instance_profile_name
+
   # Adiciona VPC correta
   subnet_id = data.aws_subnet.publica.id
 
