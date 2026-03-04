@@ -109,7 +109,6 @@ jobs:
         run: |
           # Aguarda o agente SSM estabilizar na instância
           sleep 30
-          
           ansible-playbook -i hosts.ini ../playbook.yml \
             --connection aws_ssm \
             -e "ansible_aws_ssm_region=${{ secrets.AWS_DEFAULT_REGION }}" \
