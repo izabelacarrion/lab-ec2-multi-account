@@ -81,26 +81,35 @@ jobs:
       - name: Autorizar IP do Runner no Security Group
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
+          # 1. Captura o IP do Runner (para usar no --cidr)
           RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
           echo "RUNNER_IP=${RUNNER_IP}" >> $GITHUB_ENV
           
-          # Garanta que este nome 'security_group_id_web' existe no seu outputs.tf da raiz
-          SG_ID=$(terraform output -raw security_group_id_web)
+          # 2. DEBUG: Lista todos os outputs para o log
+          # Isso vai mostrar se 'security_group_id_web' está vindo com o IP por engano
+          echo "--- LISTA DE OUTPUTS DO TERRAFORM ---"
+          terraform output
+          echo "-------------------------------------"
           
-          # Validação simples para evitar erro de malformação no log
-          if [[ $SG_ID != sg-* ]]; then
-            echo "Erro: SG_ID não começa com 'sg-'. Valor recebido: $SG_ID"
+          # 3. Captura o ID garantindo que não existam aspas ou espaços
+          # Usamos o nome exato que você definiu na raiz: security_group_id_web
+          SG_ID=$(terraform output -raw security_group_id_web | tr -d '"')
+          
+          # 4. VALIDAÇÃO CRÍTICA: Se não começar com sg-, o script para aqui com erro claro
+          if [[ ! $SG_ID =~ ^sg- ]]; then
+            echo "ERRO: O output capturado foi '$SG_ID', mas a AWS exige um ID que comece com 'sg-'."
+            echo "Verifique se o 'value' no outputs.tf da raiz está apontando para o IP em vez do ID."
             exit 1
           fi
-          echo "Debug: SG_ID capturado é [$SG_ID]"
+          
           echo "SG_ID=${SG_ID}" >> $GITHUB_ENV
           
-          
+          # 5. Execução do comando AWS com variáveis protegidas
           aws ec2 authorize-security-group-ingress \
-            --group-id $SG_ID \
+            --group-id "$SG_ID" \
             --protocol tcp \
             --port 22 \
-            --cidr ${RUNNER_IP}/32
+            --cidr "${RUNNER_IP}/32"
 
       - name: Configurar Inventário do Ansible
         working-directory: ${{ env.TF_WORKING_DIR }}
