@@ -30,3 +30,8 @@ variable "chave_ssh" {
   type        = string
   description = "Chave SSH de acesso ao ambiente"
 }
+
+variable "ssm_instance_profile_name" {
+  type        = string
+  description = "Nome do Instance Profile/Role criado no console"
+}

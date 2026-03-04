@@ -43,6 +43,7 @@ jobs:
       TF_VAR_bloco_ips_liberados: ${{ secrets.IPS_PERMITIDOS }}
       TF_WORKING_DIR: ${{ github.ref == 'refs/heads/prod' && './production' || './staging' }}
       TF_VAR_chave_ssh: ${{ github.ref == 'refs/heads/production' && secrets.CHAVE_PROD || secrets.CHAVE_STAG }}
+      TF_VAR_ssm_instance_profile_name: ${{ secrets.SSM_PROFILE_NAME }}
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
@@ -77,55 +78,36 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve
         working-directory: ${{ env.TF_WORKING_DIR }}
-     
-      - name: Autorizar IP do Runner no Security Group
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: |
-          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
-          echo "RUNNER_IP=${RUNNER_IP}" >> $GITHUB_ENV
-          
-          SG_ID=$(terraform output -raw security_group_id_web)
-          echo "SG_ID=${SG_ID}" >> $GITHUB_ENV
-          
-          aws ec2 authorize-security-group-ingress \
-            --group-id "$SG_ID" \
-            --protocol tcp \
-            --port 22 \
-            --cidr "${RUNNER_IP}/32" > /dev/null 2>&1
 
-      - name: Configurar Inventário do Ansible
+      - name: Instalar Session Manager Plugin
+        run: |
+          curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+          sudo dpkg -i session-manager-plugin.deb
+
+      - name: Configurar Inventário do Ansible (Usando IDs)
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           echo "[web]" > hosts.ini
-          echo "$(terraform output -raw ip_publico_web) ansible_user=ec2-user" >> hosts.ini
+          echo "$(terraform output -raw instance_id_web)" >> hosts.ini
           echo "" >> hosts.ini
           echo "[db]" >> hosts.ini
-          echo "$(terraform output -raw ip_privado_db) ansible_user=ec2-user" >> hosts.ini
+          echo "$(terraform output -raw instance_id_db)" >> hosts.ini
 
-      - name: Rodar Ansible Playbook
+      - name: Rodar Ansible Playbook via SSM
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'False'
+
           SSH_PRIVATE_KEY: ${{ github.ref == 'refs/heads/prod' && secrets.AWS_SSH_KEY_PROD || secrets.AWS_SSH_KEY_STG }}
         run: |
-          sleep 40
+          # Aguarda um pouco para o agente SSM subir na AWS
+          sleep 30
           
           echo "$SSH_PRIVATE_KEY" > key.pem
           chmod 400 key.pem
           
-          eval $(ssh-agent -s)
-          ssh-add key.pem
-          
-          WEB_IP=$(terraform output -raw ip_publico_web)
-          
-          ansible-playbook -i ./hosts.ini ../playbook.yml \
-            --ssh-common-args="-o StrictHostKeyChecking=no -o ForwardAgent=yes -o ProxyCommand='ssh -i key.pem -W %h:%p -q ec2-user@$WEB_IP -o StrictHostKeyChecking=no'"
-
-      - name: Remover IP do Runner do Security Group
-        if: always()
-        run: |
-          aws ec2 revoke-security-group-ingress \
-            --group-id ${{ env.SG_ID }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ env.RUNNER_IP }}/32 > /dev/null 2>&1
+          ansible-playbook -i hosts.ini ../playbook.yml \
+            --private-key key.pem \
+            -u ec2-user \
+            --connection aws_ssm \
+            --extra-vars "ansible_aws_ssm_region=${{ secrets.AWS_DEFAULT_REGION }}"
