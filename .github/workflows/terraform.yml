@@ -87,7 +87,7 @@ jobs:
       - name: Instalar Dependências AWS para Ansible
         run: |
           ansible-galaxy collection install amazon.aws
-          pip install boto3 botocore
+          pipx inject ansible-core boto3 botocore
 
       - name: Configurar Inventário do Ansible (Usando IDs)
         working-directory: ${{ env.TF_WORKING_DIR }}
