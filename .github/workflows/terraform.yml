@@ -79,20 +79,28 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Autorizar IP do Runner no Security Group
+        working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
           echo "RUNNER_IP=${RUNNER_IP}" >> $GITHUB_ENV
           
-          # Captura o ID do Security Group via Output do Terraform
-          SG_ID=$(terraform output -raw ip_publico_web)
+          # Garanta que este nome 'security_group_id_web' existe no seu outputs.tf da raiz
+          SG_ID=$(terraform output -raw security_group_id_web)
+          
+          # Validação simples para evitar erro de malformação no log
+          if [[ $SG_ID != sg-* ]]; then
+            echo "Erro: SG_ID não começa com 'sg-'. Valor recebido: $SG_ID"
+            exit 1
+          fi
+          echo "Debug: SG_ID capturado é [$SG_ID]"
           echo "SG_ID=${SG_ID}" >> $GITHUB_ENV
+          
           
           aws ec2 authorize-security-group-ingress \
             --group-id $SG_ID \
             --protocol tcp \
             --port 22 \
             --cidr ${RUNNER_IP}/32
-        working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Configurar Inventário do Ansible
         working-directory: ${{ env.TF_WORKING_DIR }}
