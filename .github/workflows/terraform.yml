@@ -80,56 +80,45 @@ jobs:
 
       
       - name: Autorizar IP do Runner no Security Group
-        id: sg_auth
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
           echo "RUNNER_IP=${RUNNER_IP}" >> $GITHUB_ENV
           
-          # Captura o ID garantindo o diretório de trabalho correto
           SG_ID=$(terraform output -raw security_group_id_web)
           echo "SG_ID=${SG_ID}" >> $GITHUB_ENV
           
+          # Silenciando o output para não expor ARNs e IDs de regras no log
           aws ec2 authorize-security-group-ingress \
-            --group-id $SG_ID \
+            --group-id "$SG_ID" \
             --protocol tcp \
             --port 22 \
-            --cidr ${RUNNER_IP}/32
+            --cidr "${RUNNER_IP}/32" > /dev/null 2>&1
 
-      - name: Configurar Inventário do Ansible
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: |
-          echo "[web]" > hosts.ini
-          echo "$(terraform output -raw ip_publico_web) ansible_user=ec2-user" >> hosts.ini
-          echo "" >> hosts.ini
-          echo "[db]" >> hosts.ini
-          echo "$(terraform output -raw ip_privado_db) ansible_user=ec2-user" >> hosts.ini
-          
       - name: Rodar Ansible Playbook
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'False'
           SSH_PRIVATE_KEY: ${{ github.ref == 'refs/heads/prod' && secrets.AWS_SSH_KEY_PROD || secrets.AWS_SSH_KEY_STG }}
         run: |
-          # 1. Pausa estratégica
-          echo "Aguardando 20 segundos para a rede AWS estabilizar..."
+          # Mantendo a pausa que ajudou na estabilidade
           sleep 20
           
-          # 2. Preparação da Chave
+          # Criando a chave (certifique-se que o Secret tem o BEGIN e END)
           echo "$SSH_PRIVATE_KEY" > key.pem
           chmod 400 key.pem
           
           WEB_IP=$(terraform output -raw ip_publico_web)
           
-          # 3. Execução do Ansible
           ansible-playbook -i hosts.ini ../playbook.yml --private-key key.pem \
-            --ssh-common-args="-o StrictHostKeyChecking=no -o ConnectTimeout=60 -o ConnectionAttempts=10 -o ControlMaster=auto -o ControlPersist=60s -o ProxyCommand='ssh -i key.pem -W %h:%p -q ec2-user@$WEB_IP -o StrictHostKeyChecking=no'"
-            
+            --ssh-common-args="-o StrictHostKeyChecking=no -o ConnectTimeout=60 -o ProxyCommand='ssh -i key.pem -W %h:%p -q ec2-user@$WEB_IP -o StrictHostKeyChecking=no'"
+
       - name: Remover IP do Runner do Security Group
         if: always()
         run: |
+          # Silenciando também na remoção
           aws ec2 revoke-security-group-ingress \
             --group-id ${{ env.SG_ID }} \
             --protocol tcp \
             --port 22 \
-            --cidr ${{ env.RUNNER_IP }}/32
+            --cidr ${{ env.RUNNER_IP }}/32 > /dev/null 2>&1
