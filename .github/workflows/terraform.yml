@@ -98,10 +98,6 @@ jobs:
           echo "[db]" >> hosts.ini
           echo "$(terraform output -raw instance_id_db)" >> hosts.ini
 
-          echo "--- Conteúdo do hosts.ini ---"
-          cat hosts.ini
-          echo "A região detectada é: ${{ secrets.AWS_DEFAULT_REGION }}"
-
       - name: Rodar Ansible Playbook via SSM
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
