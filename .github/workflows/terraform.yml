@@ -98,10 +98,17 @@ jobs:
           echo "[db]" >> hosts.ini
           echo "$(terraform output -raw instance_id_db)" >> hosts.ini
 
+          echo "--- Conteúdo do hosts.ini ---"
+          cat hosts.ini
+
       - name: Rodar Ansible Playbook via SSM
         working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: 'False'
         run: |
+          # Aguarda o agente SSM estabilizar na instância
           sleep 30
+          
           ansible-playbook -i hosts.ini ../playbook.yml \
             --connection aws_ssm \
             -e "ansible_aws_ssm_region=${{ secrets.AWS_DEFAULT_REGION }}" \
