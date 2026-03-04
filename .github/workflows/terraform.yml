@@ -2,6 +2,8 @@ name: Deploy Infraestrutura
 run-name: ${{ github.actor }} iniciou o deploy 
 
 on:
+  push:
+    branches: [ "stg", "prod" ]
   workflow_dispatch:
 
 permissions:
