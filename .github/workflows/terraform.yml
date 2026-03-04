@@ -90,14 +90,13 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'False'
-          # Seleciona o secret baseado na branch: stg -> AWS_SSH_KEY_STG | prod -> AWS_SSH_KEY_PROD
           SSH_PRIVATE_KEY: ${{ github.ref == 'refs/heads/prod' && secrets.AWS_SSH_KEY_PROD || secrets.AWS_SSH_KEY_STG }}
         run: |
           echo "$SSH_PRIVATE_KEY" > key.pem
           chmod 400 key.pem
           
-          # Captura o IP da Web para o ProxyCommand
           WEB_IP=$(terraform output -raw ip_publico_web)
           
-          ansible-playbook -i hosts.ini playbook.yml --private-key key.pem \
+          # Adicionado o ../ antes do nome do playbook
+          ansible-playbook -i hosts.ini ../playbook.yml --private-key key.pem \
             --ssh-common-args="-o ProxyCommand='ssh -i key.pem -W %h:%p -q ec2-user@$WEB_IP -o StrictHostKeyChecking=no' -o StrictHostKeyChecking=no"
