@@ -34,27 +34,32 @@ Configuração (Ansible via SSM): Gerenciamento de configuração (Nginx e DB) u
 ---
 
 ## 📁 Estrutura do Repositório
-.
-├── .github/workflows/ # Pipelines CI/CD
-├── modules/ # Módulos reutilizáveis Terraform
-├── staging/ # Configuração do ambiente staging
-├── production/ # Configuração do ambiente production
-├── playbook.yml # Playbook Ansible
-└── README.md # Documentação
 
+```text
+.
+├── .github/workflows/  # Pipelines CI/CD (GitHub Actions)
+├── modules/            # Módulos reutilizáveis do Terraform (ex: vpc, ec2, rds)
+├── staging/            # Configuração e estado do ambiente de Staging/Homologação
+├── production/         # Configuração e estado do ambiente de Produção
+├── playbook.yml        # Playbook Ansible para configuração de instâncias
+└── README.md           # Documentação técnica do projeto
+```
 ---
 
-🛰️ Gestão via AWS SSM (Zero Trust)
+🛰️ Gestão via AWS SSM (Zero Trust):
+
 O acesso às instâncias é realizado exclusivamente via AWS Systems Manager (SSM).
 Sem SSH: Porta 22 fechada e eliminação total de chaves privadas .pem.
 Acesso Privado: Gerenciamento de instâncias em subnets privadas sem necessidade de IPs públicos ou Bastion Hosts.
 Ansible over SSM: Automação configurada para usar o túnel do SSM como transporte.
 
-🔒 Segregação e Identidade
+🔒 Segregação e Identidade:
+
 Multi-Account: Ambientes isolados em contas AWS distintas para prevenir a propagação de falhas.
 OIDC: Autenticação do GitHub Actions via OpenID Connect, eliminando credenciais estáticas no repositório.
 
-📈 Observabilidade com CloudWatch
+📈 Observabilidade com CloudWatch:
+
 Logs de Execução: Histórico completo de comandos do Ansible registrados no CloudWatch Logs.
 Alertas de Saúde: Monitoramento do status do agente SSM e métricas de hardware.
 Notificações: Alertas configurados para notificar falhas críticas de infraestrutura em tempo real.
