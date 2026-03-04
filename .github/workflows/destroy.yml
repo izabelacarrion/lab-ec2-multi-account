@@ -17,6 +17,8 @@ jobs:
       TF_WORKING_DIR: ${{ github.ref == 'refs/heads/prod' && './production' || './staging' }}
       TF_VAR_bloco_ips_liberados: ${{ secrets.IPS_PERMITIDOS }}
       TF_VAR_chave_ssh: ${{ github.ref == 'refs/heads/production' && secrets.CHAVE_PROD || secrets.CHAVE_STAG }}
+      TF_VAR_ssm_instance_profile_name: ${{ secrets.SSM_PROFILE_NAME }}
+
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
