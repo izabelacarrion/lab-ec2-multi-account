@@ -2,8 +2,7 @@ name: Deploy Infraestrutura
 run-name: ${{ github.actor }} iniciou o deploy 
 
 on:
-  push:
-    branches: [ "stg", "prod" ]
+  workflow_dispatch:
 
 permissions:
   id-token: write # permite que a action solicite o token OIDC
@@ -83,7 +82,7 @@ jobs:
           echo "RUNNER_IP=${RUNNER_IP}" >> $GITHUB_ENV
           
           # Captura o ID do Security Group via Output do Terraform
-          SG_ID=$(terraform output -raw security_group_id_web)
+          SG_ID=$(terraform output -raw ip_publico_web)
           echo "SG_ID=${SG_ID}" >> $GITHUB_ENV
           
           aws ec2 authorize-security-group-ingress \
